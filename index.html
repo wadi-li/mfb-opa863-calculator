@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MFB ФНЧ на OPA863 — расчёт и подбор E24/E6</title>
+<style>
+:root{
+  --bg:#f6f6f3;--surface:#ffffff;--surface2:#f0f0ec;--border:#dcdcd5;--text:#1f2326;--muted:#62686d;
+  --accent:#1f6f78;--accent-soft:#dcecee;--warn:#a5600b;--warn-bg:#fbf1e2;--bad:#a8322d;--bad-bg:#f9e5e3;--ok:#2e7d4f;--ok-bg:#e3f2e8;
+  --grid:#e4e4de;--grid2:#cfcfc7;--ch1:#b4690e;--ch2:#1f6f78;--ch3:#8a8f94;--ch4:#7a4ea3;
+  --radius:8px;--mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+}
+[data-theme=dark]{
+  --bg:#16191b;--surface:#1e2225;--surface2:#262b2f;--border:#353b40;--text:#e3e6e8;--muted:#9aa1a7;
+  --accent:#5fb3bc;--accent-soft:#1d3436;--warn:#e0a94f;--warn-bg:#3a2f1c;--bad:#e7817b;--bad-bg:#3d2322;--ok:#6cc893;--ok-bg:#1d3527;
+  --grid:#2b3034;--grid2:#3b4247;--ch1:#e5a24a;--ch2:#5fb3bc;--ch3:#7d858b;--ch4:#b493d6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0;font-weight:650}
+header .sub{color:var(--muted);font-size:12.5px}
+.hbtn{display:flex;gap:8px}
+button{font:inherit;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+[data-theme=dark] button.primary{color:#10282b}
+main{display:grid;grid-template-columns:330px minmax(0,1fr);gap:18px;padding:18px 22px;max-width:1600px;margin:0 auto}
+@media (max-width:980px){main{grid-template-columns:minmax(0,1fr);padding:12px}header{flex-wrap:wrap;padding:12px}}
+section,aside{min-width:0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px}
+.card h2{font-size:14.5px;margin:0 0 10px;font-weight:650}
+.card h3{font-size:13px;margin:12px 0 6px;color:var(--muted);font-weight:600;text-transform:none}
+aside .card{padding:12px 14px}
+.f{display:grid;grid-template-columns:1fr 118px;align-items:center;gap:6px;margin:5px 0}
+.f label{font-size:13px;color:var(--text)}
+.f small{display:block;color:var(--muted);font-size:11.5px}
+input,select{font:inherit;width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:4px 6px}
+input[type=range]{padding:0}
+input:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:4px 0 8px}
+.seg button{flex:1;border:0;border-radius:0;padding:5px 4px;font-size:12.5px;background:var(--surface)}
+.seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface2);border-radius:6px;padding:8px 10px}
+.kpi .l{font-size:11.5px;color:var(--muted)}
+.kpi .v{font-size:17px;font-weight:650;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:13px;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+tr.sel td{background:var(--accent-soft)}
+tbody.pick tr{cursor:pointer}
+tbody.pick tr:hover td{background:var(--surface2)}
+.mono{font-family:var(--mono)}
+.msg{border-radius:6px;padding:7px 10px;margin:5px 0;font-size:13px}
+.msg.ok{background:var(--ok-bg);color:var(--ok)}
+.msg.warn{background:var(--warn-bg);color:var(--warn)}
+.msg.bad{background:var(--bad-bg);color:var(--bad)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:1250px){.grid2{grid-template-columns:minmax(0,1fr)}}
+canvas{width:100%;display:block;background:var(--surface);border-radius:6px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin:4px 0 6px}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+.legend i.dash{background:none!important;border-top:2px dashed}
+.scopectl{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:10px}
+.scopectl .f{grid-template-columns:auto 110px;margin:0}
+.scopes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:1300px){.scopes{grid-template-columns:minmax(0,1fr)}}
+.scope h3{margin:0 0 4px;color:var(--text);font-size:13px}
+.svgwrap{overflow-x:auto}
+.svgwrap svg{max-width:100%;height:auto;display:block;margin:0 auto}
+.note{color:var(--muted);font-size:12px}
+details summary{cursor:pointer;color:var(--accent);font-size:13px}
+.formula{font-family:var(--mono);font-size:12.5px;background:var(--surface2);padding:8px 10px;border-radius:6px;white-space:pre-wrap;line-height:1.55}
+@media print{header .hbtn,aside{display:none}main{display:block}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Каскад MFB ФНЧ 2-го порядка на OPA863</h1>
+    <div class="sub">Однополярное питание, сдвиг уровня, подбор R — E24, C — E6, модель ОУ с конечным GBW</div>
+  </div>
+  <div class="hbtn">
+    <button id="csvBtn">BOM в CSV</button>
+    <button id="printBtn">Печать / PDF</button>
+    <button id="themeBtn" aria-label="Переключить тему">Тёмная тема</button>
+  </div>
+</header>
+<main>
+<aside>
+  <div class="card">
+    <h2>Фильтр</h2>
+    <div class="seg" id="typeSeg">
+      <button data-v="bessel" class="on">Бессель</button>
+      <button data-v="lp005">Фазолин. 0,05°</button>
+      <button data-v="custom">Свой f0/Q</button>
+    </div>
+    <div class="f"><label>Частота среза −3 дБ<small>МГц</small></label><input id="fc" type="number" step="0.01" value="1.7"></div>
+    <div class="f" id="rowK"><label>f0 / f−3дБ (FSF)</label><input id="fsf" type="number" step="0.0001" value="1.2736"></div>
+    <div class="f" id="rowQ"><label>Добротность Q</label><input id="qt" type="number" step="0.0001" value="0.5773"></div>
+    <div class="f"><label>Рабочая полоса<small>до, кГц</small></label><input id="fwork" type="number" value="250"></div>
+  </div>
+
+  <div class="card">
+    <h2>Вход и усиление</h2>
+    <div class="f"><label>Vвх мин, В</label><input id="vinmin" type="number" step="0.1" value="-30"></div>
+    <div class="f"><label>Vвх макс, В</label><input id="vinmax" type="number" step="0.1" value="30"></div>
+    <div class="f"><label>Rвх = R1<small>округляется до E24</small></label><input id="r1" type="number" value="10000"></div>
+    <div class="seg" id="gainSeg">
+      <button data-v="auto" class="on">G авто (по диапазону)</button>
+      <button data-v="man">G вручную</button>
+    </div>
+    <div class="f"><label>|G| = R2/R1<small>0,02 … 20</small></label><input id="gain" type="number" step="0.001" min="0.02" max="20" value="0.05"></div>
+    <input id="gainRange" type="range" min="0" max="1000" value="250" aria-label="Коэффициент усиления">
+  </div>
+
+  <div class="card">
+    <h2>Питание и смещение</h2>
+    <div class="f"><label>Vcc, В</label><input id="vcc" type="number" step="0.1" value="3.3"></div>
+    <div class="f"><label>Запас выхода до шин, В<small>OPA863: 0,13–0,15 В при 2 кОм</small></label><input id="hr" type="number" step="0.01" value="0.15"></div>
+    <div class="seg" id="biasSeg">
+      <button data-v="auto" class="on">Vвых(0) задано</button>
+      <button data-v="man">Vb вручную</button>
+    </div>
+    <div class="f" id="rowV0"><label>Vвых при Vвх = 0, В</label><input id="vout0" type="number" step="0.01" value="1.65"></div>
+    <div class="f" id="rowVb"><label>Vb на IN+, В<small>0 … Vcc</small></label><input id="vbman" type="number" step="0.001" value="0.0786"></div>
+    <input id="vbRange" type="range" min="0" max="3300" value="79" aria-label="Смещение Vb">
+  </div>
+
+  <div class="card">
+    <h2>Ограничения подбора</h2>
+    <div class="f"><label>Cmin, пФ</label><input id="cmin" type="number" value="10"></div>
+    <div class="f"><label>Cmax, пФ</label><input id="cmax" type="number" value="10000"></div>
+    <div class="f"><label>R3 мин, Ом</label><input id="r3min" type="number" value="100"></div>
+    <div class="f"><label>R3 макс, Ом</label><input id="r3max" type="number" value="100000"></div>
+    <h3>Модель OPA863 (VS = 3 В)</h3>
+    <div class="f"><label>GBW, МГц</label><input id="gbw" type="number" value="50"></div>
+    <div class="f"><label>Aol, дБ</label><input id="aol" type="number" value="123"></div>
+    <div class="f"><label>Cвх IN− + плата, пФ<small>0,9 синф. + 0,5 диф. + монтаж</small></label><input id="cpar" type="number" step="0.1" value="1.9"></div>
+    <div class="f"><label>SR, В/мкс</label><input id="sr" type="number" value="105"></div>
+    <h3>Допуски (Монте-Карло)</h3>
+    <div class="f"><label>Резисторы, ±%</label><input id="tolr" type="number" step="0.1" value="1"></div>
+    <div class="f"><label>Конденсаторы, ±%<small>C0G/NP0</small></label><input id="tolc" type="number" step="0.5" value="5"></div>
+  </div>
+</aside>
+
+<section>
+  <div class="card">
+    <h2>Результат подбора</h2>
+    <div id="msgs"></div>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Схема</h2>
+      <div class="svgwrap" id="schem"></div>
+      <p class="note">C1 — на общий провод (AC-земля). Vb — от делителя с развязкой Cb или от ЦАП/опоры. Цифры у выводов — DBV-5 (SOT-23-5): 1 OUT, 2 V−, 3 IN+, 4 IN−, 5 V+.</p>
+    </div>
+    <div class="card">
+      <h2>Перечень компонентов</h2>
+      <div style="overflow-x:auto"><table><thead><tr><th>Поз.</th><th>Номинал</th><th>Ряд</th><th>Примечание</th></tr></thead><tbody id="bom"></tbody></table></div>
+      <h3>Статический режим</h3>
+      <table><tbody id="dc"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Варианты подбора</h2>
+    <p class="note" style="margin-top:0">Ранжирование — по отклонению реальной АФЧХ (с GBW, Aol и Cвх) от целевой в полосе 0,05…2·fc и по ошибке f−3дБ. Щелчок по строке выбирает вариант.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>R2</th><th>R3</th><th>C1</th><th>C2</th><th>f0 идеал.</th><th>Q идеал.</th><th>f−3дБ реал.</th><th>Подъём</th><th>Ошибка</th></tr></thead><tbody id="cands" class="pick"></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Частотные характеристики</h2>
+    <div class="legend"><span><i style="background:var(--ch2)"></i>с OPA863 (E-номиналы)</span><span><i class="dash" style="border-color:var(--ch3)"></i>целевая (идеальная)</span><span><i style="background:var(--ch1)"></i>рабочая полоса / fc</span></div>
+    <div class="grid2">
+      <div><canvas id="cMag" height="260"></canvas></div>
+      <div><canvas id="cGd" height="260"></canvas></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div><canvas id="cPh" height="220"></canvas></div>
+      <div><canvas id="cLoop" height="220"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Осциллограммы до и после фильтра</h2>
+    <div class="scopectl">
+      <div class="f"><label>Частота, кГц</label><input id="sf" type="number" step="1" value="100" min="0.01" max="250"></div>
+      <input id="sfRange" type="range" min="0" max="1000" value="826" style="width:180px" aria-label="Частота сигнала">
+      <div class="f"><label>Амплитуда, В</label><input id="sa" type="number" step="0.1" value="30"></div>
+      <div class="f"><label>Смещение, В</label><input id="so" type="number" step="0.1" value="0"></div>
+      <div class="f"><label>Периодов</label><input id="sp" type="number" min="1" max="10" value="2"></div>
+    </div>
+    <div class="legend"><span><i style="background:var(--ch1)"></i>CH1: вход Vвх (до фильтра)</span><span><i class="dash" style="border-color:var(--ch3)"></i>идеальный сдвиг уровня без фильтра</span><span><i style="background:var(--ch2)"></i>CH2: выход ОУ (после фильтра)</span><span><i class="dash" style="border-color:var(--bad)"></i>пределы выхода</span></div>
+    <div class="scopes">
+      <div class="scope"><h3>Треугольник</h3><canvas id="sTri" height="380"></canvas><div class="note" id="iTri"></div></div>
+      <div class="scope"><h3>Меандр</h3><canvas id="sSq" height="380"></canvas><div class="note" id="iSq"></div></div>
+      <div class="scope"><h3>Синусоида</h3><canvas id="sSin" height="380"></canvas><div class="note" id="iSin"></div></div>
+    </div>
+    <p class="note">Установившийся периодический режим: сумма гармоник входного сигнала через реальную передаточную функцию каскада, затем ограничение по размаху выхода. Задержка фильтра видна как сдвиг выхода относительно пунктира.</p>
+  </div>
+
+  <div class="card">
+    <h2>Расчётные соотношения</h2>
+    <div class="formula">H(s) = −(R2/R1) / (1 + s·C2·(R2 + R3 + R2·R3/R1) + s²·R2·R3·C1·C2)
+f0 = 1 / (2π·√(R2·R3·C1·C2))      Q = √(R2·R3·C1·C2) / (C2·(R2 + R3 + R2·R3/R1))
+Условие реализуемости: C1/C2 ≥ 4·Q²·(1 + R2/R1)
+DC: Vвых = (1 + G)·Vb − G·Vвх,  G = R2/R1  →  Vb = Vвых(0)/(1 + G)
+Бессель 2-го порядка: f0 = 1,2736·f−3дБ, Q = 0,5773;  фазолинейный 0,05°: f0 = 1,2098·f−3дБ, Q = 0,5997
+Реальная модель: A(s) = A0/(1 + s·A0/(2π·GBW)), Cвх на IN−, узловой анализ без упрощений.</div>
+    <p class="note">Коэффициенты прототипов — по таблицам Analog Devices (AN-649, Basic Linear Design гл. 8). Параметры OPA863 — даташит TI SBOS973, таблица VS = 3 В.</p>
+  </div>
+</section>
+</main>
+
+<script>
+"use strict";
+// ---------- утилиты ----------
+const $=id=>document.getElementById(id);
+const E24=[1.0,1.1,1.2,1.3,1.5,1.6,1.8,2.0,2.2,2.4,2.7,3.0,3.3,3.6,3.9,4.3,4.7,5.1,5.6,6.2,6.8,7.5,8.2,9.1];
+const E6=[1.0,1.5,2.2,3.3,4.7,6.8];
+function series(list,lo,hi){const out=[];for(let d=-13;d<=7;d++){for(const m of list){const v=+(m*Math.pow(10,d)).toPrecision(3);if(v>=lo*0.999&&v<=hi*1.001)out.push(v);}}return out;}
+function nearestE(list,x){const d=Math.floor(Math.log10(x));let best=null,be=1e9;for(let k=d-1;k<=d+1;k++)for(const m of list){const v=+(m*Math.pow(10,k)).toPrecision(3);const e=Math.abs(Math.log(v/x));if(e<be){be=e;best=v;}}return best;}
+function neighE(list,x){ // ближайшие снизу и сверху
+  const all=series(list,x/20,x*20);let lo=all[0],hi=all[all.length-1];for(const v of all){if(v<=x)lo=v;if(v>=x){hi=v;break;}}return lo===hi?[lo]:[lo,hi];}
+function fmtR(v){if(v>=1e6)return trim(v/1e6)+' МОм';if(v>=1e3)return trim(v/1e3)+' кОм';return trim(v)+' Ом';}
+function fmtC(v){if(v>=1e-6)return trim(v*1e6)+' мкФ';if(v>=1e-9)return trim(v*1e9)+' нФ';return trim(v*1e12)+' пФ';}
+function fmtF(v){if(v>=1e6)return num(v/1e6,3)+' МГц';if(v>=1e3)return num(v/1e3,3)+' кГц';return num(v,3)+' Гц';}
+function trim(x){return (+x.toPrecision(3)).toString().replace('.',',');}
+function num(x,p=3){if(!isFinite(x))return '—';return (+x.toPrecision(p)).toLocaleString('ru-RU',{maximumFractionDigits:6});}
+function fx(x,d=3){if(!isFinite(x))return '—';return x.toFixed(d).replace('.',',').replace('-','−');}
+const val=id=>parseFloat(String($(id).value).replace(',','.'));
+// комплексная арифметика
+const C=(re,im=0)=>({re,im});
+const cadd=(a,b)=>C(a.re+b.re,a.im+b.im), csub=(a,b)=>C(a.re-b.re,a.im-b.im);
+const cmul=(a,b)=>C(a.re*b.re-a.im*b.im,a.re*b.im+a.im*b.re);
+const cdiv=(a,b)=>{const d=b.re*b.re+b.im*b.im;return C((a.re*b.re+a.im*b.im)/d,(a.im*b.re-a.re*b.im)/d);};
+const cabs=a=>Math.hypot(a.re,a.im), carg=a=>Math.atan2(a.im,a.re), cs=(k,a)=>C(k*a.re,k*a.im);
+
+// ---------- модели ----------
+let P={}; // параметры
+function opA(s){const A0=Math.pow(10,P.aol/20),wt=2*Math.PI*P.gbw*1e6;return cdiv(C(A0),cadd(C(1),cs(A0/wt,s)));}
+// реальная передаточная функция Vo/Vin (AC, IN+ на AC-земле)
+function Hreal(f,c){const s=C(0,2*Math.PI*f);const a=opA(s);
+  const YA=cadd(C(1/c.R1+1/c.R2+1/c.R3),cs(c.C1,s));
+  const sC2=cs(c.C2,s);const YN=cadd(C(1/c.R3),cs(c.C2+P.cpar,s));
+  const t=cadd(cdiv(YN,a),sC2);
+  const D=csub(cadd(cs(-c.R3,cmul(YA,t)),cdiv(C(1/c.R3),a)),C(1/c.R2));
+  const H=cdiv(C(1/c.R1),D);
+  // входной ток для Zвх
+  const Vo=H;const Va=cs(-c.R3,cmul(Vo,t));const Iin=cs(1/c.R1,csub(C(1),Va));
+  return {H,Zin:cdiv(C(1),Iin),a};}
+function Hideal(f,c){const w=2*Math.PI*f;const s=C(0,w);const G=c.R2/c.R1;
+  const b1=c.C2*(c.R2+c.R3+c.R2*c.R3/c.R1),b2=c.R2*c.R3*c.C1*c.C2;
+  return cdiv(C(-G),C(1-b2*w*w,b1*w));}
+function Htarget(f){const w=2*Math.PI*f,w0=2*Math.PI*P.f0t;return cdiv(C(1),C(1-(w/w0)**2,w/(w0*P.qt)));}
+// петлевое усиление T = a·β
+function loopT(f,c){const s=C(0,2*Math.PI*f);const a=opA(s);
+  // Vin=0, Vo=1: узлы A и N
+  const a11=cadd(C(1/c.R1+1/c.R2+1/c.R3),cs(c.C1,s)),a12=C(-1/c.R3),b1=C(1/c.R2);
+  const a21=C(-1/c.R3),a22=cadd(C(1/c.R3),cs(c.C2+P.cpar,s)),b2=cs(c.C2,s);
+  const det=csub(cmul(a11,a22),cmul(a12,a21));
+  const Vn=cdiv(csub(cmul(a11,b2),cmul(a21,b1)),det);
+  return cmul(a,Vn);}
+function f3db(fn,c,ref){let lo=1e3,hi=1e9;const t=ref/Math.SQRT2;
+  if(cabs(fn(hi,c).H||fn(hi,c))>t)return NaN;
+  for(let i=0;i<60;i++){const m=Math.sqrt(lo*hi);const h=fn(m,c);const v=cabs(h.H||h);if(v>t)lo=m;else hi=m;}return Math.sqrt(lo*hi);}
+function peakDb(c,H0){let pk=0;for(let i=0;i<120;i++){const f=P.fc*0.02*Math.pow(150,i/119);const v=cabs(Hreal(f,c).H)/H0;if(v>pk)pk=v;}return 20*Math.log10(pk);}
+
+// ---------- состояние ----------
+const S={type:'bessel',gmode:'auto',bmode:'auto',sel:0,cands:[],chosen:null};
+const PROTO={bessel:{k:1.2736,q:0.5773},lp005:{k:1.2098,q:0.5997}};
+
+function readP(){
+  P.fc=val('fc')*1e6;P.fsf=val('fsf');P.qt=val('qt');P.f0t=P.fc*P.fsf;P.fwork=val('fwork')*1e3;
+  P.vinmin=val('vinmin');P.vinmax=val('vinmax');P.R1=nearestE(E24,Math.max(10,val('r1')));
+  P.vcc=val('vcc');P.hr=val('hr');P.vol=P.hr;P.voh=P.vcc-P.hr;
+  P.cmin=val('cmin')*1e-12;P.cmax=val('cmax')*1e-12;P.r3min=val('r3min');P.r3max=val('r3max');
+  P.gbw=val('gbw');P.aol=val('aol');P.cpar=val('cpar')*1e-12;P.sr=val('sr');
+  P.tolr=val('tolr')/100;P.tolc=val('tolc')/100;
+}
+function chooseR2(){
+  if(S.gmode==='auto'){
+    const v0=S.bmode==='auto'?val('vout0'):null;
+    // инвертирующий каскад: Vвх max → выход вниз, Vвх min → вверх
+    const vmid=v0!==null?v0:(P.vol+P.voh)/2;
+    let g=Infinity;
+    if(P.vinmax>0)g=Math.min(g,(vmid-P.vol)/P.vinmax);
+    if(P.vinmin<0)g=Math.min(g,(P.voh-vmid)/(-P.vinmin));
+    if(!isFinite(g)||g<=0)g=0.02;
+    g=Math.min(20,Math.max(0.02,g));
+    // ближайший E24 не больше требуемого
+    const opts=series(E24,P.R1*0.02*0.999,P.R1*20*1.001);let r2=opts[0];for(const v of opts){if(v<=g*P.R1*1.0001)r2=v;}
+    $('gain').value=(r2/P.R1).toFixed(4);syncGainRange();
+    return r2;}
+  const g=Math.min(20,Math.max(0.02,val('gain')));return nearestE(E24,g*P.R1);
+}
+function searchR2(R2,nTop=80,keep=12){
+  const w0=2*Math.PI*P.f0t;
+  const Cs=series(E6,P.cmin,P.cmax);const list=[];
+  for(const C1 of Cs)for(const C2 of Cs){
+    const r3i=1/(w0*w0*R2*C1*C2);if(r3i<P.r3min/1.2||r3i>P.r3max*1.2)continue;
+    for(const R3 of neighE(E24,r3i)){if(R3<P.r3min||R3>P.r3max)continue;
+      const b2=R2*R3*C1*C2,b1=C2*(R2+R3+R2*R3/P.R1);const f0=1/(2*Math.PI*Math.sqrt(b2)),q=Math.sqrt(b2)/b1;
+      const e0=Math.abs(Math.log(f0/P.f0t))+Math.abs(Math.log(q/P.qt));
+      list.push({R1:P.R1,R2,R3,C1,C2,f0,q,e0});}}
+  list.sort((a,b)=>a.e0-b.e0);
+  const top=list.slice(0,nTop);
+  for(const c of top){
+    const H0=cabs(Hreal(1,c).H);c.H0=H0;let err=0,n=0;
+    for(let i=0;i<40;i++){const f=P.fc*0.05*Math.pow(40,i/39);const h=cs(-1/H0,Hreal(f,c).H);const t=Htarget(f);const d=csub(h,t);err+=d.re*d.re+d.im*d.im;n++;}
+    c.err=Math.sqrt(err/n);
+    if(c.C2<5*P.cpar)c.err+=0.02*(5*P.cpar/c.C2);
+    if(c.R3>50e3)c.err+=0.005*(c.R3/50e3);
+    c.f3=f3db(Hreal,c,H0);c.pk=peakDb(c,H0);c.err+=0.6*Math.abs((c.f3||0)/P.fc-1);}
+  top.sort((a,b)=>a.err-b.err);
+  return top.slice(0,keep);}
+function search(){const R2=chooseR2();S.cands=searchR2(R2);S.sel=0;S.maxG=null;}
+function goodCand(c){return c&&Math.abs(c.f3/P.fc-1)<0.05&&Math.abs(c.q/P.qt-1)<0.1&&c.err<0.06;}
+function findMaxG(){ // наибольший G (E24 R2), при котором есть годное решение
+  const opts=series(E24,P.R1*0.02*0.999,P.R1*20*1.001);let best=null;
+  for(const R2 of opts){const c=searchR2(R2,25,1)[0];if(goodCand(c))best={G:R2/P.R1,c};}
+  return best;}
+function biasDivider(vb){
+  if(vb<=0.0005)return {type:'gnd',vb:0};
+  if(vb>=P.vcc-0.0005)return {type:'vcc',vb:P.vcc};
+  const Rs=series(E24,1e3,100e3);let best=null;
+  for(const Rt of Rs)for(const Rb of Rs){const v=P.vcc*Rb/(Rt+Rb);const rth=Rt*Rb/(Rt+Rb);const e=Math.abs(v-vb)+(rth>20e3?1e-4:0)+Math.abs(Math.log(rth/5e3))*2e-6;
+    if(!best||e<best.e)best={Rt,Rb,vb:v,rth,e,type:'div'};}
+  return best;}
+
+// ---------- расчёт ----------
+function computeAll(resel=true){
+  readP();
+  if(resel){const r=search();}
+  const c=S.cands[S.sel];S.chosen=c;
+  renderMsgsAndKpis(c);renderTable();renderSchem(c);renderPlots(c);renderScopes(c);
+}
+function biasInfo(c){
+  const G=c.R2/c.R1;let vb;
+  if(S.bmode==='auto'){vb=val('vout0')/(1+G);}else{vb=Math.min(P.vcc,Math.max(0,val('vbman')));}
+  const div=biasDivider(vb);
+  return {G,vbTarget:vb,div,vbAct:div.vb,vout0:(1+G)*div.vb};}
+
+function renderMsgsAndKpis(c){
+  const m=[];const box=$('msgs');
+  if(!c){box.innerHTML='<div class="msg bad">Нет решений в заданных пределах C и R3. Расширьте Cmin…Cmax или R3.</div>';$('kpis').innerHTML='';return;}
+  const B=biasInfo(c);S.B=B;const G=B.G;
+  if(S.bmode==='auto'){$('vbman').value=B.vbTarget.toFixed(4);$('vbRange').value=Math.round(B.vbTarget*1000);}
+  const H0=c.H0;const hw=Hreal(P.fwork,c);const gw=20*Math.log10(cabs(hw.H)/H0);
+  const ph=(carg(cs(-1,hw.H))*180/Math.PI);
+  const gd=(f)=>{const d=f*1e-4;const p1=carg(cs(-1,Hreal(f-d,c).H)),p2=carg(cs(-1,Hreal(f+d,c).H));return -(p2-p1)/(2*Math.PI*2*d);};
+  const gd0=gd(100),gdw=gd(P.fwork);
+  const Tfc=cabs(loopT(P.fc,c)),Tw=cabs(loopT(P.fwork,c));
+  const voutAtMin=B.vout0-G*P.vinmin,voutAtMax=B.vout0-G*P.vinmax;
+  const vlo=Math.min(voutAtMin,voutAtMax),vhi=Math.max(voutAtMin,voutAtMax);
+  const ratio=c.C1/c.C2,need=4*P.qt*P.qt*(1+G);
+  const zin_w=cabs(hw.Zin),zin_fc=cabs(Hreal(P.fc,c).Zin);
+  const vinScale=(B.vout0-P.vcc/2)/G; // какое Vвх даёт Vcc/2
+  // перегрузка: выход в насыщении → узел A
+  const ovr=[P.vinmin*1.0,P.vinmax*1.0].map(v=>{const vo=Math.min(P.voh,Math.max(P.vol,B.vout0-G*v));return (v/c.R1+vo/c.R2)/(1/c.R1+1/c.R2);});
+  // MC
+  const mc=monteCarlo(c);S.mc=mc;
+  // сообщения
+  if(!goodCand(c)){if(!S.maxG)S.maxG=findMaxG()||{G:NaN};
+    m.push(['bad',`При G = ${num(G,4)} и Rвх = ${fmtR(c.R1)} каскад MFB с C ≥ ${fmtC(P.cmin)} и R3 ≥ ${fmtR(P.r3min)} не даёт нужной характеристики: лучший Q = ${num(c.q,3)} (нужно ${num(P.qt,4)}). Нужны C2 в единицы пФ и R3 в единицы Ом, плюс не хватает GBW. ${isFinite(S.maxG.G)?`Максимальный реализуемый G при этих ограничениях ≈ ${num(S.maxG.G,3)} (R2 = ${fmtR(S.maxG.G*c.R1)}).`:''} Большое усиление вынесите в отдельный неинвертирующий каскад до или после фильтра.`]);}
+  if(Math.abs(c.f3/P.fc-1)<0.03)m.push(['ok',`Реальная частота среза ${fmtF(c.f3)} — отклонение ${fx((c.f3/P.fc-1)*100,1)} % от заданной.`]);
+  else m.push(['warn',`Реальная частота среза ${fmtF(c.f3)} отличается от заданной на ${fx((c.f3/P.fc-1)*100,1)} %. Причина — дискретность E6/E24, ограничения номиналов или нехватка GBW.`]);
+  if(vlo<P.vol-1e-6||vhi>P.voh+1e-6)m.push(['bad',`Выход выходит за допустимый размах: ${fx(vlo,3)}…${fx(vhi,3)} В при пределах ${fx(P.vol,2)}…${fx(P.voh,2)} В. Уменьшите G или сдвиньте Vb.`]);
+  else m.push(['ok',`Диапазон Vвх ${fx(P.vinmin,1)}…${fx(P.vinmax,1)} В → Vвых ${fx(vhi,3)}…${fx(vlo,3)} В (в пределах ${fx(P.vol,2)}…${fx(P.voh,2)} В).`]);
+  if(B.vbAct<-0.2||B.vbAct>P.vcc+0.2)m.push(['bad','Vb вне синфазного диапазона OPA863 (−0,2 … Vcc+0,2 В).']);
+  if(Tfc<10)m.push(['warn',`Петлевое усиление на fc всего ${num(Tfc,2)} — характеристика заметно зависит от GBW. При G = ${num(G,3)} шумовое усиление каскада велико; подбор уже учитывает GBW, но разброс ОУ даст ±дрейф fc.`]);
+  if(ratio<need)m.push(['bad',`C1/C2 = ${num(ratio,3)} ниже предела реализуемости 4Q²(1+G) = ${num(need,3)}.`]);else if(ratio<need*1.1)m.push(['warn',`C1/C2 = ${num(ratio,3)} близко к пределу реализуемости ${num(need,3)} — высокая чувствительность Q к допускам.`]);
+  const ovrBad=ovr.some(v=>v>P.vcc+0.3||v<-0.3);
+  if(ovrBad)m.push(['warn',`При перегрузке по входу (выход в насыщении) узел R1/R2/R3 уходит до ${fx(Math.min(...ovr),2)}…${fx(Math.max(...ovr),2)} В; через R3 = ${fmtR(c.R3)} ток идёт в защитные диоды IN−. Ограничьте ток (≤ 10 мА) или добавьте ограничительные диоды на узле.`]);
+  const p1=Math.max(...[P.vinmin,P.vinmax].map(v=>(v-B.vbAct)**2/c.R1));
+  m.push([p1>0.06?'warn':'ok',`Мощность на R1 до ${num(p1*1000,3)} мВт — ${p1>0.06?'типоразмер не менее 0805 (лучше 1206)':'достаточно 0603'}; напряжение на R1 до ${fx(Math.max(Math.abs(P.vinmin-B.vbAct),Math.abs(P.vinmax-B.vbAct)),1)} В.`]);
+  const srNeed=2*Math.PI*P.fwork*(Math.min(vhi,P.voh)-Math.max(vlo,P.vol))/2/1e6;
+  m.push([srNeed<P.sr/3?'ok':'warn',`Требуемая скорость нарастания для синуса ${fmtF(P.fwork)} полного размаха: ${num(srNeed,3)} В/мкс (OPA863: ${P.sr} В/мкс).`]);
+  box.innerHTML=m.map(([k,t])=>`<div class="msg ${k}">${t}</div>`).join('');
+  const k=[
+    ['f−3дБ реальная',fmtF(c.f3),`цель ${fmtF(P.fc)}`],
+    ['f0 / Q (номиналы)',`${fmtF(c.f0)}`,`Q = ${num(c.q,4)} (цель ${num(P.qt,4)})`],
+    ['Усиление G',num(G,4),`${fx(20*Math.log10(G),2)} дБ, R2/R1`],
+    ['Затухание на '+fmtF(P.fwork),fx(gw,3)+' дБ',`фаза ${fx(ph,2)}°`],
+    ['Групповая задержка',num(gd0*1e9,4)+' нс',`на ${fmtF(P.fwork)}: ${num(gdw*1e9,4)} нс (Δ ${fx((gdw-gd0)*1e9,2)} нс)`],
+    ['Подъём АЧХ',fx(c.pk,3)+' дБ','максимум над DC'],
+    ['Vb на IN+',fx(B.vbAct,4)+' В',`задано ${fx(B.vbTarget,4)} В`],
+    ['Vвых при Vвх = 0',fx(B.vout0,4)+' В',`Vcc/2 соответствует Vвх = ${fx(vinScale,3)} В`],
+    ['|Zвх|',fmtR(c.R1),`на ${fmtF(P.fwork)}: ${fmtR(zin_w)}; на fc: ${fmtR(zin_fc)}`],
+    ['Петлевое усиление',`${num(Tw,3)} на ${fmtF(P.fwork)}`,`на fc: ${num(Tfc,3)}`],
+    ['Монте-Карло f−3дБ',`${num(mc.f3min/1e6,4)}…${num(mc.f3max/1e6,4)} МГц`,`R ±${P.tolr*100} %, C ±${P.tolc*100} %, GBW −30…+30 %`],
+    ['Монте-Карло на '+fmtF(P.fwork),`${fx(mc.gwmin,3)}…${fx(mc.gwmax,3)} дБ`,`Vos·(1+G) ≤ ±${num(1.3*(1+G),3)} мВ`],
+  ];
+  $('kpis').innerHTML=k.map(([l,v,d])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+  // BOM
+  const bom=[
+    ['R1',fmtR(c.R1),'E24, 1 %',`Rвх; ${p1>0.06?'0805/1206':'0603'}, ${num(p1*1000,3)} мВт`],
+    ['R2',fmtR(c.R2),'E24, 1 %',`обратная связь, G = ${num(G,4)}`],
+    ['R3',fmtR(c.R3),'E24, 1 %','к IN−'],
+    ['C1',fmtC(c.C1),'E6, C0G','узел R1/R2/R3 → GND'],
+    ['C2',fmtC(c.C2),'E6, C0G','IN− → OUT, минимальная длина'],
+  ];
+  if(B.div.type==='div'){bom.push(['R4',fmtR(B.div.Rt),'E24, 0,1–1 %','Vcc → IN+']);bom.push(['R5',fmtR(B.div.Rb),'E24, 0,1–1 %','IN+ → GND']);
+    bom.push(['C3','10 мкФ','E6, X7R',`развязка Vb, fср = ${fmtF(1/(2*Math.PI*B.div.rth*10e-6))}`]);}
+  else bom.push(['IN+',B.div.type==='gnd'?'на GND':'на Vcc','—','делитель не нужен']);
+  bom.push(['C4','100 нФ','E6, X7R','развязка V+ у вывода 5']);
+  bom.push(['DA1','OPA863IDBVR','—','SOT-23-5, TI']);
+  S.bom=bom;
+  $('bom').innerHTML=bom.map(r=>`<tr>${r.map((x,i)=>`<td${i==1?' class="mono"':''}>${x}</td>`).join('')}</tr>`).join('');
+  $('dc').innerHTML=[
+    ['Vb (делитель)',fx(B.vbAct,4)+' В'+(B.div.type==='div'?`, Rэкв = ${fmtR(B.div.rth)}`:'')],
+    ['Погрешность Vвых(0) от ряда E24',fx((B.vout0-(S.bmode==='auto'?val('vout0'):B.vout0))*1000,2)+' мВ'],
+    ['Vвых при Vвх мин / макс',`${fx(voutAtMin,3)} / ${fx(voutAtMax,3)} В`],
+    ['Ток R1 макс',num(Math.max(Math.abs(P.vinmin-B.vbAct),Math.abs(P.vinmax-B.vbAct))/c.R1*1000,3)+' мА'],
+    ['Ток выхода ОУ в R2 макс',num(Math.max(Math.abs(voutAtMin-B.vbAct),Math.abs(voutAtMax-B.vbAct))/c.R2*1000,3)+' мА'],
+    ['Смещение от Vos (±1,3 мВ макс)','±'+num(1.3*(1+G),3)+' мВ на выходе'],
+  ].map(r=>`<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
+}
+function monteCarlo(c){
+  const N=250;let f3min=1e12,f3max=0,gwmin=1e9,gwmax=-1e9;const save={gbw:P.gbw};
+  let seed=12345;const rnd=()=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;};
+  const u=t=>1+(2*rnd()-1)*t;
+  for(let i=0;i<N;i++){
+    const k={R1:c.R1*u(P.tolr),R2:c.R2*u(P.tolr),R3:c.R3*u(P.tolr),C1:c.C1*u(P.tolc),C2:c.C2*u(P.tolc)};
+    P.gbw=save.gbw*u(0.3);
+    const H0=cabs(Hreal(1,k).H);const f=f3db(Hreal,k,H0);const g=20*Math.log10(cabs(Hreal(P.fwork,k).H)/H0);
+    if(f<f3min)f3min=f;if(f>f3max)f3max=f;if(g<gwmin)gwmin=g;if(g>gwmax)gwmax=g;}
+  P.gbw=save.gbw;return {f3min,f3max,gwmin,gwmax};}
+
+function renderTable(){
+  $('cands').innerHTML=S.cands.map((c,i)=>`<tr data-i="${i}" class="${i===S.sel?'sel':''}"><td>${i+1}</td><td class="mono">${fmtR(c.R2)}</td><td class="mono">${fmtR(c.R3)}</td><td class="mono">${fmtC(c.C1)}</td><td class="mono">${fmtC(c.C2)}</td><td>${fmtF(c.f0)}</td><td>${num(c.q,4)}</td><td>${fmtF(c.f3)}</td><td>${fx(c.pk,3)} дБ</td><td>${num(c.err*100,3)} %</td></tr>`).join('');
+}
+$('cands').addEventListener('click',e=>{const tr=e.target.closest('tr');if(!tr)return;S.sel=+tr.dataset.i;computeAll(false);});
+
+// ---------- схема ----------
+function renderSchem(c){
+  if(!c){$('schem').innerHTML='';return;}const B=S.B;
+  const st='stroke="currentColor" stroke-width="1.6" fill="none"';
+  const res=(x,y,vert,lab,v)=>vert?`<rect x="${x-7}" y="${y}" width="14" height="40" ${st}/><text x="${x+12}" y="${y+16}" class="t">${lab}</text><text x="${x+12}" y="${y+31}" class="v">${v}</text>`
+    :`<rect x="${x}" y="${y-7}" width="44" height="14" ${st}/><text x="${x+22}" y="${y-13}" text-anchor="middle" class="t">${lab}</text><text x="${x+22}" y="${y+24}" text-anchor="middle" class="v">${v}</text>`;
+  const cap=(x,y,vert,lab,v,lx=12)=>vert?`<line x1="${x-12}" y1="${y}" x2="${x+12}" y2="${y}" ${st}/><line x1="${x-12}" y1="${y+6}" x2="${x+12}" y2="${y+6}" ${st}/><text x="${x+lx}" y="${y-8}" class="t">${lab}</text><text x="${x+lx}" y="${y+22}" class="v">${v}</text>`
+    :`<line x1="${x}" y1="${y-12}" x2="${x}" y2="${y+12}" ${st}/><line x1="${x+6}" y1="${y-12}" x2="${x+6}" y2="${y+12}" ${st}/><text x="${x+3}" y="${y-18}" text-anchor="middle" class="t">${lab}</text><text x="${x+3}" y="${y+28}" text-anchor="middle" class="v">${v}</text>`;
+  const gnd=(x,y)=>`<line x1="${x}" y1="${y}" x2="${x}" y2="${y+8}" ${st}/><line x1="${x-10}" y1="${y+8}" x2="${x+10}" y2="${y+8}" ${st}/><line x1="${x-6}" y1="${y+12}" x2="${x+6}" y2="${y+12}" ${st}/><line x1="${x-2}" y1="${y+16}" x2="${x+2}" y2="${y+16}" ${st}/>`;
+  const L=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${st}/>`;
+  const dot=(x,y)=>`<circle cx="${x}" cy="${y}" r="3" fill="currentColor"/>`;
+  let s=`<svg viewBox="0 0 640 380" width="640" xmlns="http://www.w3.org/2000/svg" style="color:var(--text);font-family:system-ui,Arial">
+  <style>.t{font-size:12px;font-weight:600;fill:currentColor}.v{font-size:11.5px;fill:currentColor;opacity:.8}.p{font-size:10px;fill:currentColor;opacity:.65}</style>`;
+  // вход
+  s+=`<circle cx="30" cy="150" r="4" ${st}/><text x="18" y="135" class="t">Vвх</text><text x="8" y="175" class="v">${fx(P.vinmin,0)}…${fx(P.vinmax,0)} В</text>`;
+  s+=L(34,150,70,150)+res(70,150,false,'R1',fmtR(c.R1))+L(114,150,190,150)+dot(190,150);
+  // C1 вниз
+  s+=L(190,150,190,215)+cap(190,215,true,'C1',fmtC(c.C1),16)+L(190,221,190,260)+gnd(190,260);
+  // R2 вверх к выходу
+  s+=L(190,150,190,45)+L(190,45,290,45)+res(290,45,false,'R2',fmtR(c.R2))+L(334,45,520,45)+L(520,45,520,170);
+  // R3 к IN−
+  s+=L(190,150,230,150)+res(230,150,false,'R3',fmtR(c.R3))+L(274,150,340,150)+dot(340,150);
+  // C2
+  s+=L(340,150,340,95)+L(340,95,460,95)+cap(460,95,false,'C2',fmtC(c.C2))+L(466,95,520,95)+dot(520,95);
+  // ОУ: треугольник
+  s+=`<polygon points="380,130 380,210 470,170" ${st}/>`+L(340,150,380,150)+`<text x="386" y="155" class="t">−</text><text x="386" y="196" class="t">+</text>`;
+  s+=`<text x="397" y="174" class="v">OPA863</text><text x="370" y="146" class="p">4</text><text x="370" y="187" class="p">3</text><text x="474" y="164" class="p">1</text>`;
+  s+=L(470,170,560,170)+dot(520,170)+`<circle cx="564" cy="170" r="4" ${st}/><text x="574" y="166" class="t">Vвых</text><text x="574" y="182" class="v">${fx(P.vol,2)}…${fx(P.voh,2)} В</text>`;
+  // питание
+  s+=L(425,150,425,136)+L(417,136,433,136)+`<text x="429" y="148" class="p">5</text>`;
+  s+=L(425,190,425,240)+gnd(425,240)+`<text x="429" y="236" class="p">2</text>`;
+  s+=`<text x="400" y="130" class="v">+${fx(P.vcc,1)} В</text>`;
+  // IN+ смещение
+  s+=L(380,190,330,190)+L(330,190,330,260);
+  if(B.div.type==='div'){
+    s+=dot(330,260)+`<text x="322" y="252" text-anchor="end" class="t">Vb = ${fx(B.vbAct,4)} В</text>`;
+    s+=L(330,260,330,280)+res(330,280,true,'R5',fmtR(B.div.Rb))+L(330,320,330,335)+gnd(330,335);
+    s+=L(330,260,560,260)+L(560,260,560,250)+res(560,210,true,'R4',fmtR(B.div.Rt))+L(560,210,560,200)+`<text x="540" y="195" class="v">+${fx(P.vcc,1)} В</text>`;
+    s+=L(330,260,270,260)+L(270,260,270,290)+cap(270,290,true,'C3','10 мкФ',-58)+L(270,296,270,320)+gnd(270,320);
+  } else if(B.div.type==='gnd'){s+=gnd(330,260)+`<text x="338" y="254" class="t">Vb = 0</text>`;}
+  else {s+=`<text x="338" y="266" class="v">к +${fx(P.vcc,1)} В (Vb = Vcc)</text>`;}
+  s+=`<text x="20" y="360" class="v">G = −${num(c.R2/c.R1,4)}, f−3дБ ≈ ${fmtF(c.f3)}, Q = ${num(c.q,4)}; Vвых = ${fx(1+c.R2/c.R1,4)}·Vb − ${num(c.R2/c.R1,4)}·Vвх</text>`;
+  s+='</svg>';$('schem').innerHTML=s;
+}
+
+// ---------- графики ----------
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function prep(cv){const r=cv.getBoundingClientRect();const dpr=window.devicePixelRatio||1;const h=+cv.getAttribute('height');cv.width=Math.max(300,r.width)*dpr;cv.height=h*dpr;cv.style.height=h+'px';const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);return {g,W:Math.max(300,r.width),H:h};}
+function plotLog(cv,o){
+  const {g,W,H}=prep(cv);const m={l:52,r:12,t:22,b:30};const pw=W-m.l-m.r,ph=H-m.t-m.b;
+  g.font='11px system-ui,Arial';g.fillStyle=css('--text');g.fillText(o.title,m.l,14);
+  const lx0=Math.log10(o.fmin),lx1=Math.log10(o.fmax);const X=f=>m.l+(Math.log10(f)-lx0)/(lx1-lx0)*pw;const Y=v=>m.t+(o.ymax-v)/(o.ymax-o.ymin)*ph;
+  g.strokeStyle=css('--grid');g.lineWidth=1;
+  for(let d=Math.ceil(lx0);d<=lx1;d++){for(let k=1;k<10;k++){const f=k*Math.pow(10,d);if(f<o.fmin||f>o.fmax)continue;g.strokeStyle=k===1?css('--grid2'):css('--grid');g.beginPath();g.moveTo(X(f),m.t);g.lineTo(X(f),m.t+ph);g.stroke();}
+    g.fillStyle=css('--muted');const f=Math.pow(10,d);g.fillText(f>=1e6?(f/1e6)+'M':f>=1e3?(f/1e3)+'k':f,X(f)-8,H-12);}
+  const step=o.ystep;for(let v=Math.ceil(o.ymin/step)*step;v<=o.ymax+1e-9;v+=step){g.strokeStyle=css('--grid');g.beginPath();g.moveTo(m.l,Y(v));g.lineTo(m.l+pw,Y(v));g.stroke();g.fillStyle=css('--muted');g.fillText((+v.toFixed(3)).toString().replace('.',','),6,Y(v)+4);}
+  g.fillStyle=css('--muted');g.textAlign='right';g.fillText(o.unit+'  /  частота, Гц',m.l+pw,14);g.textAlign='left';
+  for(const mk of o.marks||[]){g.strokeStyle=css('--ch1');g.setLineDash([3,3]);g.beginPath();g.moveTo(X(mk),m.t);g.lineTo(X(mk),m.t+ph);g.stroke();g.setLineDash([]);}
+  g.save();g.beginPath();g.rect(m.l,m.t,pw,ph);g.clip();
+  for(const s of o.series){g.strokeStyle=s.color;g.lineWidth=s.w||1.8;g.setLineDash(s.dash||[]);g.beginPath();s.pts.forEach(([f,v],i)=>{const x=X(f),y=Y(Math.max(o.ymin-1000,Math.min(o.ymax+1000,v)));i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();}
+  g.restore();g.setLineDash([]);g.strokeStyle=css('--border');g.strokeRect(m.l,m.t,pw,ph);
+}
+function renderPlots(c){
+  if(!c)return;const N=300,fmin=1e3,fmax=1e8;const fs=[];for(let i=0;i<N;i++)fs.push(fmin*Math.pow(fmax/fmin,i/(N-1)));
+  const H0=c.H0;const mag=[],magT=[],ph=[],phT=[],gd=[],gdT=[],lp=[];
+  let prev=null,prevT=null,off=0,offT=0;
+  for(const f of fs){const h=cs(-1/H0,Hreal(f,c).H),t=Htarget(f);mag.push([f,20*Math.log10(cabs(h))]);magT.push([f,20*Math.log10(cabs(t))]);
+    let p=carg(h);if(prev!==null){while(p+off-prev>Math.PI)off-=2*Math.PI;while(p+off-prev<-Math.PI)off+=2*Math.PI;}p+=off;prev=p;ph.push([f,p*180/Math.PI]);
+    let q=carg(t);if(prevT!==null){while(q+offT-prevT>Math.PI)offT-=2*Math.PI;while(q+offT-prevT<-Math.PI)offT+=2*Math.PI;}q+=offT;prevT=q;phT.push([f,q*180/Math.PI]);
+    lp.push([f,20*Math.log10(cabs(loopT(f,c)))]);}
+  for(let i=1;i<N-1;i++){const dw=2*Math.PI*(fs[i+1]-fs[i-1]);gd.push([fs[i],-(ph[i+1][1]-ph[i-1][1])*Math.PI/180/dw*1e9]);gdT.push([fs[i],-(phT[i+1][1]-phT[i-1][1])*Math.PI/180/dw*1e9]);}
+  const col=css('--ch2'),colT=css('--ch3');const marks=[P.fwork,P.fc];
+  plotLog($('cMag'),{title:'АЧХ, нормированная к DC',unit:'дБ',fmin,fmax,ymin:-60,ymax:6,ystep:6,marks,series:[{pts:magT,color:colT,dash:[5,4],w:1.4},{pts:mag,color:col}]});
+  const gmax=Math.max(...gd.filter(p=>p[0]<P.fc*4).map(p=>p[1]),...gdT.map(p=>p[1]))*1.25;
+  plotLog($('cGd'),{title:'Групповая задержка',unit:'нс',fmin,fmax:P.fc*20,ymin:0,ymax:Math.ceil(gmax/20)*20,ystep:Math.ceil(gmax/20)*20/5,marks,series:[{pts:gdT.filter(p=>p[0]<P.fc*20),color:colT,dash:[5,4],w:1.4},{pts:gd.filter(p=>p[0]<P.fc*20),color:col}]});
+  plotLog($('cPh'),{title:'ФЧХ (без учёта инверсии)',unit:'град',fmin,fmax,ymin:-270,ymax:0,ystep:45,marks,series:[{pts:phT,color:colT,dash:[5,4],w:1.4},{pts:ph,color:col}]});
+  plotLog($('cLoop'),{title:'Петлевое усиление |T| = |A·β|',unit:'дБ',fmin,fmax,ymin:-20,ymax:140,ystep:20,marks,series:[{pts:lp,color:css('--ch4')}]});
+}
+
+// ---------- осциллограммы ----------
+function synth(kind,c,f,A,Voff,per,Np){
+  const B=S.B;const G=c.R2/c.R1;const T=per/f;const ts=[];for(let i=0;i<Np;i++)ts.push(i/(Np-1)*T);
+  const vin=ts.map(t=>{const ph=((t*f)%1+1)%1;if(kind==='sin')return Voff+A*Math.sin(2*Math.PI*ph);
+    if(kind==='sq')return Voff+(ph<0.5?A:-A);
+    // треугольник синфазный с синусом: 0→A при ph=0.25
+    let v=ph<0.25?4*ph:ph<0.75?2-4*ph:4*ph-4;return Voff+A*v;});
+  // гармоники
+  const Hdc=Hreal(1,c).H.re; // ≈ −G
+  const harm=[];
+  if(kind==='sin')harm.push([1,A]);
+  else{const nmax=Math.min(6000,Math.max(50,Math.floor(30*P.fc/f)));
+    for(let n=1;n<=nmax;n+=2){if(kind==='sq')harm.push([n,4*A/(Math.PI*n)]);else harm.push([n,8*A/(Math.PI*Math.PI*n*n)*((((n-1)/2)%2)?-1:1)]);}}
+  const Hs=harm.map(([n,b])=>{const h=Hreal(n*f,c).H;return [n,b,h];});
+  const dcOut=(1+G)*B.vbAct+Hdc*Voff;
+  const out=new Float64Array(Np);
+  for(let i=0;i<Np;i++){const w=2*Math.PI*f*ts[i];let acc=0;
+    for(const [n,b,h] of Hs){const a=n*w;acc+=b*(h.re*Math.sin(a)+h.im*Math.cos(a));}
+    out[i]=Math.min(P.voh,Math.max(P.vol,dcOut+acc));}
+  const ideal=vin.map(v=>(1+G)*B.vbAct-G*v);
+  return {ts,vin,out,ideal,T};}
+function drawScope(cv,d,info){
+  const {g,W,H}=prep(cv);const m={l:46,r:12,t:10,b:36};const pw=W-m.l-m.r;const gap=18;const ph=(H-m.t-m.b-gap)/2;
+  g.font='11px system-ui,Arial';
+  const panes=[{y0:m.t,lo:-Math.max(Math.abs(P.vinmin),Math.abs(P.vinmax),Math.abs(+$('sa').value)+Math.abs(+$('so').value)),label:'CH1 Vвх, В'},{y0:m.t+ph+gap,lo:0,hi:P.vcc,label:'CH2 Vвых, В'}];
+  panes[0].hi=-panes[0].lo;
+  const X=t=>m.l+t/d.T*pw;
+  panes.forEach((p,k)=>{
+    const Y=v=>p.y0+(p.hi-v)/(p.hi-p.lo)*ph;p.Y=Y;
+    g.strokeStyle=css('--grid');g.lineWidth=1;
+    for(let i=0;i<=10;i++){g.beginPath();g.moveTo(m.l+i*pw/10,p.y0);g.lineTo(m.l+i*pw/10,p.y0+ph);g.stroke();}
+    for(let i=0;i<=8;i++){g.strokeStyle=i===4?css('--grid2'):css('--grid');g.beginPath();g.moveTo(m.l,p.y0+i*ph/8);g.lineTo(m.l+pw,p.y0+i*ph/8);g.stroke();}
+    g.strokeStyle=css('--border');g.strokeRect(m.l,p.y0,pw,ph);
+    g.fillStyle=css('--muted');for(let i=0;i<=4;i++){const v=p.hi-(p.hi-p.lo)*i/4;g.fillText(fx(v,Math.abs(p.hi)>=10?0:2),4,p.y0+i*ph/4+4);}
+  });
+  const line=(arr,Y,color,dash,w)=>{g.strokeStyle=color;g.lineWidth=w||1.8;g.setLineDash(dash||[]);g.beginPath();arr.forEach((v,i)=>{const x=X(d.ts[i]),y=Y(v);i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();g.setLineDash([]);};
+  g.save();g.beginPath();g.rect(m.l,m.t,pw,H-m.t-m.b);g.clip();
+  line(d.vin,panes[0].Y,css('--ch1'));
+  const Y2=panes[1].Y;g.strokeStyle=css('--bad');g.setLineDash([4,4]);g.lineWidth=1;[P.vol,P.voh].forEach(v=>{g.beginPath();g.moveTo(m.l,Y2(v));g.lineTo(m.l+pw,Y2(v));g.stroke();});g.setLineDash([]);
+  line(d.ideal.map(v=>Math.max(-1,Math.min(P.vcc+1,v))),Y2,css('--ch3'),[5,4],1.3);
+  line(Array.from(d.out),Y2,css('--ch2'),null,2);
+  g.restore();
+  panes.forEach((p,k)=>{const w=g.measureText(p.label).width+8;g.fillStyle=css('--surface');g.globalAlpha=.85;g.fillRect(m.l+1,p.y0+1,w,16);g.globalAlpha=1;g.fillStyle=k?css('--ch2'):css('--ch1');g.fillText(p.label,m.l+4,p.y0+12);});
+  g.fillStyle=css('--muted');const tdiv=d.T/10;const tu=tdiv>=1e-3?[1e3,'мс']:tdiv>=1e-6?[1e6,'мкс']:[1e9,'нс'];
+  g.fillText(`Развёртка ${num(tdiv*tu[0],3)} ${tu[1]}/дел`,m.l,H-6);
+  g.fillText(`CH1 ${num((panes[0].hi-panes[0].lo)/8,3)} В/дел · CH2 ${num(P.vcc/8,3)} В/дел`,m.l,H-21);
+  info.textContent=`Vвых: ${fx(Math.min(...d.out),3)}…${fx(Math.max(...d.out),3)} В; без фильтра: ${fx(Math.min(...d.ideal),3)}…${fx(Math.max(...d.ideal),3)} В`;
+}
+function renderScopes(c){if(!c)return;
+  const f=Math.max(0.01,val('sf'))*1e3,A=val('sa'),o=val('so'),per=Math.min(10,Math.max(1,Math.round(val('sp'))));
+  [['tri','sTri','iTri'],['sq','sSq','iSq'],['sin','sSin','iSin']].forEach(([k,id,ii])=>drawScope($(id),synth(k,c,f,A,o,per,900),$(ii)));}
+
+// ---------- связи UI ----------
+function seg(id,key,cb){$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));S[key]=b.dataset.v;cb&&cb();});}
+function updVis(){const cu=S.type==='custom';$('fsf').disabled=!cu;$('qt').disabled=!cu;
+  if(!cu){$('fsf').value=PROTO[S.type].k;$('qt').value=PROTO[S.type].q;}
+  $('gain').disabled=S.gmode==='auto';$('gainRange').disabled=S.gmode==='auto';
+  $('rowV0').style.opacity=S.bmode==='auto'?1:.45;$('vout0').disabled=S.bmode!=='auto';
+  $('vbman').disabled=S.bmode==='auto';$('vbRange').disabled=S.bmode==='auto';}
+seg('typeSeg','type',()=>{updVis();computeAll();});
+seg('gainSeg','gmode',()=>{updVis();computeAll();});
+seg('biasSeg','bmode',()=>{updVis();computeAll(false);});
+// логарифмический слайдер G 0,02…20
+function syncGainRange(){const g=val('gain');$('gainRange').value=Math.round(Math.log(g/0.02)/Math.log(1000)*1000);}
+$('gainRange').addEventListener('input',()=>{const g=0.02*Math.pow(1000,$('gainRange').value/1000);$('gain').value=g.toFixed(4);debounce(()=>computeAll(),60);});
+$('vbRange').addEventListener('input',()=>{$('vbman').value=($('vbRange').value/1000).toFixed(3);debounce(()=>computeAll(false),40);});
+$('sfRange').addEventListener('input',()=>{const f=0.1*Math.pow(2500,$('sfRange').value/1000);$('sf').value=f<10?f.toFixed(2):f.toFixed(1);debounce(()=>renderScopes(S.chosen),30);});
+let tmr=null;function debounce(fn,ms){clearTimeout(tmr);tmr=setTimeout(fn,ms);}
+const full=['fc','fsf','qt','fwork','vinmin','vinmax','r1','gain','vcc','hr','vout0','cmin','cmax','r3min','r3max','gbw','aol','cpar','tolr','tolc','sr'];
+full.forEach(id=>$(id).addEventListener('input',()=>{if(id==='gain')syncGainRange();debounce(()=>computeAll(id!=='vout0'&&id!=='tolr'&&id!=='tolc'&&id!=='sr'),250);}));
+$('vbman').addEventListener('input',()=>{$('vbRange').value=Math.round(val('vbman')*1000);debounce(()=>computeAll(false),200);});
+['sf','sa','so','sp'].forEach(id=>$(id).addEventListener('input',()=>debounce(()=>renderScopes(S.chosen),150)));
+$('themeBtn').addEventListener('click',()=>{const d=document.documentElement;const dark=d.dataset.theme!=='dark';d.dataset.theme=dark?'dark':'light';$('themeBtn').textContent=dark?'Светлая тема':'Тёмная тема';computeAll(false);});
+$('printBtn').addEventListener('click',()=>window.print());
+$('csvBtn').addEventListener('click',()=>{
+  const q=s=>{s=String(s);return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const c=S.chosen;const rows=[['Поз. обозначение','Номинал','Ряд / тип','Примечание'],...S.bom];
+  rows.push([]);rows.push(['Параметр','Значение']);
+  rows.push(['Тип',S.type==='bessel'?'Бессель':S.type==='lp005'?'Фазолинейный 0,05°':'Пользовательский']);
+  rows.push(['f−3дБ цель, Гц',P.fc]);rows.push(['f−3дБ реальная, Гц',Math.round(c.f3)]);rows.push(['f0, Гц',Math.round(c.f0)]);rows.push(['Q',c.q.toFixed(4).replace('.',',')]);
+  rows.push(['G',(c.R2/c.R1).toFixed(4).replace('.',',')]);rows.push(['Vb, В',S.B.vbAct.toFixed(4).replace('.',',')]);rows.push(['Vвых(0), В',S.B.vout0.toFixed(4).replace('.',',')]);
+  const csv='\uFEFF'+rows.map(r=>r.map(q).join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='MFB_OPA863_BOM.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
+window.addEventListener('resize',()=>debounce(()=>computeAll(false),150));
+updVis();syncGainRange();computeAll();
+</script>
+</body>
+</html>
